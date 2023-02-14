@@ -710,6 +710,27 @@ def _divide_batch(x: Expr, expr: Expr):
     return expr
 
 
+@register_gradient("relax.nn.nll_loss")
+def nll_loss(
+    orig_var: Var,
+    orig_call: Call,
+    output_grad: Var,
+    ctx: BlockBuilder,
+) -> List[Expr]:
+    """Gradient of cross_entropy_without_logits.
+
+    Forward Form:
+        z = cross_entropy_without_logits(x, y)
+
+    Backward:
+        Returns [-z_grad * y / x, -z_grad * log(x)].
+        If it has batch_size N, the results should divide by N.
+    """
+    _, y = orig_call.args
+    #output_grad = _divide_batch(x, output_grad)
+    return [y, y]
+
+
 @register_gradient("relax.nn.cross_entropy_without_logits")
 def cross_entropy_without_logits_grad(
     orig_var: Var,
