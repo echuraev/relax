@@ -23,7 +23,7 @@ from tvm.ir.base import assert_structural_equal
 from tvm.script.parser import ir as I, relax as R, tir as T
 from tvm.relax.training import SetupTrainer
 from tvm.relax.training.optimizer import SGD
-from tvm.relax.training.loss import MSELoss
+from tvm.relax.training.loss import MSELoss, CrossEntropyLoss
 from tvm.relax.training.trainer import Trainer
 
 
@@ -177,6 +177,30 @@ def test_invalid_mod():
 
     with pytest.raises(TypeError):
         setup_trainer(NoParamsNumAttr)
+
+
+@tvm.testing.parametrize_targets("llvm")
+def test_execute_cross_entropy(target, dev):
+    backbone, params_num = _get_backbone()
+    pred_sinfo = relax.TensorStructInfo((1, 5), "float32")
+    target_sinfo = relax.TensorStructInfo((1,), "int32")
+
+    setup_trainer = SetupTrainer(
+        CrossEntropyLoss(reduction="sum"),
+        SGD(0.001),
+        [pred_sinfo, target_sinfo],
+    )
+
+    trainer = Trainer(backbone, params_num, setup_trainer)
+    trainer.build(target, dev)
+    trainer.xaiver_uniform_init_params()
+
+    dataset = _make_dataset()
+    last_loss = np.inf
+    for epoch in range(5):
+        for i, data in enumerate(dataset):
+            loss = trainer.update_params(data[0], data[1])
+    trainer.predict(dataset[0][0])
 
 
 if __name__ == "__main__":
